@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interactive Map with Distance Calculation and Custom Markers</title>
+    <style>
+        /* Container for the map */
+        #mapContainer {
+            position: relative;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Styling for the map */
+        #map {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Styling for the InfoWindow */
+        .gm-style .gm-style-iw-d::-webkit-scrollbar-track,
+        .gm-style .gm-style-iw-d::-webkit-scrollbar-track-piece,
+        .gm-style .gm-style-iw-c,
+        .gm-style .gm-style-iw-t::after {
+            background: #35748C;
+        }
+
+        .gm-style .gm-style-iw-tc::after {
+            background: #35748C;
+        }
+
+        .gm-style-iw-tc {
+            display: none;
+        }
+    </style>
+
+    <!-- Loading the Google Maps JavaScript API -->
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&libraries=places,geometry"
+        async defer></script>
+</head>
+<body>
+
+    <div id="mapContainer">
+        <div id="map"></div>
+    </div>
+    
+    <script type="text/javascript">
+        // Declaring variables for map, directions service, renderer, and markers
+        let map,
+            directionsService,
+            directionsRenderer,
+            distanceMarker,
+            fixedMarker,
+            activeRoute;
+
+        // Coordinates and icon for the main pin
+        const mainPin = {
+            lat: 14.388993,
+            lng: 121.042436,
+            icon: "./images/mainPin.png",
+        };
+
+        // Array of fixed pins with labels, coordinates, and icons
+        const fixedPins = [{
+                label: "A",
+                lat: 14.392197,
+                lng: 121.044631,
+                icon: "./images/fixedPin.png",
+            },
+            {
+                label: "B",
+                lat: 14.389628,
+                lng: 121.046652,
+                icon: "./images/fixedPin.png",
+            },
+            {
+                label: "C",
+                lat: 14.383144,
+                lng: 121.047905,
+                icon: "./images/fixedPin.png",
+            },
+            {
+                label: "D",
+                lat: 14.38295,
+                lng: 121.040436,
+                icon: "./images/fixedPin.png",
+            },
+        ];
+
+        // Function to initialize the map
+        function initMap() {
+            const uluru = {
+                lat: 14.388993,
+                lng: 121.042436
+            };
+            const mapOptions = {
+                zoom: 14,
+                minZoom: 15,
+                center: uluru,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false,
+                zoomControl: false,
+                styles: [{
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#f5f5f5",
+                        }, ],
+                    },
+                    {
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "off",
+                        }, ],
+                    },
+                    {
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#616161",
+                        }, ],
+                    },
+                    {
+                        elementType: "labels.text.stroke",
+                        stylers: [{
+                            color: "#f5f5f5",
+                        }, ],
+                    },
+                    {
+                        featureType: "administrative.land_parcel",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#bdbdbd",
+                        }, ],
+                    },
+                    {
+                        featureType: "poi",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#eeeeee",
+                        }, ],
+                    },
+                    {
+                        featureType: "poi",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#757575",
+                        }, ],
+                    },
+                    {
+                        featureType: "poi.park",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#e5e5e5",
+                        }, ],
+                    },
+                    {
+                        featureType: "poi.park",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#9e9e9e",
+                        }, ],
+                    },
+                    {
+                        featureType: "road",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#ffffff",
+                        }, ],
+                    },
+                    {
+                        featureType: "road.arterial",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#757575",
+                        }, ],
+                    },
+                    {
+                        featureType: "road.highway",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#dadada",
+                        }, ],
+                    },
+                    {
+                        featureType: "road.highway",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#616161",
+                        }, ],
+                    },
+                    {
+                        featureType: "road.local",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#9e9e9e",
+                        }, ],
+                    },
+                    {
+                        featureType: "transit.line",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#e5e5e5",
+                        }, ],
+                    },
+                    {
+                        featureType: "transit.station",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#eeeeee",
+                        }, ],
+                    },
+                    {
+                        featureType: "water",
+                        elementType: "geometry",
+                        stylers: [{
+                            color: "#c9c9c9",
+                        }, ],
+                    },
+                    {
+                        featureType: "water",
+                        elementType: "labels.text.fill",
+                        stylers: [{
+                            color: "#9e9e9e",
+                        }, ],
+                    },
+                ],
+            };
+
+            // Creating a new Google Maps instance
+            map = new google.maps.Map(document.getElementById("map"), mapOptions);
+
+            // Creating instances of the Directions Service and Renderer
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: "#A5854F",
+                    strokeWeight: 10,
+                },
+            });
+
+            // Binding the renderer to the map
+            directionsRenderer.setMap(map);
+
+            // Adding the main marker to the map
+            const mainMarker = new google.maps.Marker({
+                position: {
+                    lat: mainPin.lat,
+                    lng: mainPin.lng,
+                },
+                map,
+                icon: mainPin.icon,
+            });
+
+            // Adding the fixed pins to the map with click event listeners
+            fixedPins.forEach((pin) => {
+                fixedMarker = new google.maps.Marker({
+                    position: {
+                        lat: pin.lat,
+                        lng: pin.lng,
+                    },
+                    map,
+                    label: pin.label,
+                    icon: pin.icon,
+                });
+
+                fixedMarker.addListener("click", () => {
+                    if (distanceMarker) {
+                        distanceMarker.close();
+                    }
+                    calculateAndDisplayRoute(mainPin, pin);
+                });
+            });
+
+            // Setting the initial active route to pin C
+            activeRoute = fixedPins.find((pin) => pin.label === "C");
+            calculateAndDisplayRoute(mainPin, activeRoute);
+
+            // Adding a click event listener to the map
+            map.addListener("click", (event) => {
+                if (distanceMarker) {
+                    distanceMarker.close();
+                }
+
+                const isFixedPin =
+                    fixedPins.some(
+                        (pin) =>
+                        pin.lat === event.latLng.lat() && pin.lng === event.latLng.lng()
+                    ) ||
+                    (mainPin.lat === event.latLng.lat() &&
+                        mainPin.lng === event.latLng.lng());
+                if (!isFixedPin) {
+                    directionsRenderer.setDirections({
+                        routes: [],
+                    });
+
+                    map.setZoom(15);
+                    map.setCenter({
+                        lat: 14.386166,
+                        lng: 121.036136,
+                    });
+                }
+            });
+        }
+
+        // Function to calculate and display the route between two points
+        function calculateAndDisplayRoute(origin, destination) {
+            const request = {
+                origin: {
+                    lat: origin.lat,
+                    lng: origin.lng,
+                },
+                destination: {
+                    lat: destination.lat,
+                    lng: destination.lng,
+                },
+                travelMode: "DRIVING",
+            };
+
+            directionsService.route(request, function(result, status) {
+                if (status === "OK") {
+                    directionsRenderer.setDirections(result);
+
+                    // Display distance and duration for each route
+                    result.routes.forEach((route, index) => {
+                        const path = route.overview_path;
+                        const distance = route.legs.reduce(
+                            (total, leg) => total + leg.distance.value,
+                            0
+                        );
+                        const duration = route.legs.reduce(
+                            (total, leg) => total + leg.duration.value,
+                            0
+                        );
+                        const midpoint = google.maps.geometry.spherical.interpolate(
+                            path[0],
+                            path[path.length - 1],
+                            0.5
+                        );
+                        const roundedDuration = Math.ceil(duration / 60);
+                        const roundedDistance = parseFloat((distance / 1000).toFixed(1));
+
+                        const content = `
+                  <div style="color: #FFF;
+                  font-size: 16px;
+                  font-style: normal;
+                  line-height: normal;">${roundedDistance} km (${roundedDuration} min)</div>
+              `;
+
+                        distanceMarker = new google.maps.InfoWindow({
+                            position: midpoint,
+                            content: content,
+                        });
+
+                        distanceMarker.open(map);
+                    });
+                } else {
+                    alert("Directions request failed due to " + status);
+                }
+            });
+        }
+
+        // Initializing the map when the page loads
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>
